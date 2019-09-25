@@ -42,7 +42,7 @@ struct proc {
   struct mem_map p_map[NR_SEGS];/* memory map */
   pid_t p_pid;			/* process id passed in from MM */
   int p_priority;		/* task, server, or user process */
-  int q_prioriry;
+  int q_priority;
 
   clock_t user_time;		/* user time in ticks */
   clock_t sys_time;		/* sys time in ticks */
