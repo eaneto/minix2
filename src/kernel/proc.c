@@ -323,6 +323,11 @@ PRIVATE void pick_proc()
 }
 
 /**
+ * Alterações feitas pelos alunos:
+ * Edison Aguiar - 31812295
+ * Pietro Gonçalves - 31856209
+ */
+/**
  * Verifica se a prioridade do `proc2` está entre os processos do proc1.
  */
 PRIVATE int is_priority_between_proccesses(struct proc *proc1, struct proc *proc2)
