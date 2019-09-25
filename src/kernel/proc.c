@@ -179,7 +179,7 @@ message *m_ptr;			/* pointer to message buffer */
   vhi = (vb + MESS_SIZE - 1) >> CLICK_SHIFT;	/* vir click for top of msg */
   if (vlo < caller_ptr->p_map[D].mem_vir || vlo > vhi ||
       vhi >= caller_ptr->p_map[S].mem_vir + caller_ptr->p_map[S].mem_len)
-        return(EFAULT); 
+	return(EFAULT); 
 #else
   /* Check for messages wrapping around top of memory or outside data seg. */
   vb = (vir_bytes) m_ptr;
@@ -205,7 +205,7 @@ message *m_ptr;			/* pointer to message buffer */
   /* Check to see if 'dest' is blocked waiting for this message. */
   if ( (dest_ptr->p_flags & (RECEIVING | SENDING)) == RECEIVING &&
        (dest_ptr->p_getfrom == ANY ||
-        dest_ptr->p_getfrom == proc_number(caller_ptr))) {
+	dest_ptr->p_getfrom == proc_number(caller_ptr))) {
 	/* Destination is indeed waiting for this message. */
 	CopyMess(proc_number(caller_ptr), caller_ptr, m_ptr, dest_ptr,
 		 dest_ptr->p_messbuf);
@@ -322,11 +322,33 @@ PRIVATE void pick_proc()
   bill_ptr = proc_ptr = proc_addr(IDLE);
 }
 
+/**
+ * Alterações feitas pelos alunos:
+ * Edison Aguiar - 31812295
+ * Pietro Gonçalves - 31856209
+ */
+/**
+ * Verifica se a prioridade do `proc2` está entre os processos do proc1.
+ */
+PRIVATE int is_priority_between_proccesses(struct proc *proc1, struct proc *proc2)
+{
+    return proc1->q_priority < proc2->q_priority &&
+        proc1->p_nextready->q_prioriry >= proc2->q_prioriry;
+}
+
+/**
+ * Verifica se dois processos tem a mesma prioridade.
+ */
+PRIVATE int is_same_priority(struct proc *proc1, struct proc *proc2)
+{
+    return proc1->q_priority == proc2->q_priority;
+}
+
 /*===========================================================================*
- *				ready					     * 
+ *              ready                        * 
  *===========================================================================*/
 PRIVATE void ready(rp)
-register struct proc *rp;	/* this process is now runnable */
+register struct proc *rp;   /* this process is now runnable */
 {
 /* Add 'rp' to the end of one of the queues of runnable processes. Three
  * queues are maintained:
@@ -335,41 +357,187 @@ register struct proc *rp;	/* this process is now runnable */
  *   USER_Q   - (lowest priority) for user processes
  */
 
-  if (istaskp(rp)) {
-	if (rdy_head[TASK_Q] != NIL_PROC)
-		/* Add to tail of nonempty queue. */
-		rdy_tail[TASK_Q]->p_nextready = rp;
-	else {
-		proc_ptr =		/* run fresh task next */
-		rdy_head[TASK_Q] = rp;	/* add to empty queue */
-	}
-	rdy_tail[TASK_Q] = rp;
-	rp->p_nextready = NIL_PROC;	/* new entry has no successor */
-	return;
+    rp->q_priority = rp->p_nr % 10;
+
+    /**
+     * É preciso adicionar na fila de processos dependendo da
+     * prioridade (q_priority) do processo.
+     */
+    if (istaskp(rp)) {
+    /**
+     * Verifica se a fila não está vazia.
+     */
+    if (rdy_head[TASK_Q] != NIL_PROC) {
+        /**
+         * Se só houver um processo na fila, adiciona ele na
+         * posição dependendo da prioridade (q_priority).
+         */
+        if (rdy_head[TASK_Q]->p_nextready == NIL_PROC) {
+            /**
+             * Se a prioridade do processo atual for maior do que a do
+             * rp, então joga o rp para o fim da fila.
+             */
+            if (rdy_head[TASK_Q]->q_priority > rp->q_priority) {
+                rdy_tail[TASK_Q]->p_nextready = rp;
+            } else {
+                /**
+                 * Se a prioridade do rp for maior, então adiciona ele
+                 * na primeira posição da fila e joga o no head para o
+                 * próximo.
+                 */
+                struct proc *aux = rdy_head[TASK_Q];
+                rp->p_nextready = aux;
+                rdy_head[TASK_Q] = rp;
+                rdy_tail[TASK_Q] = aux;
+                aux->p_nextready = NIL_PROC;
+            }
+        } else {
+            /**
+             * Se a fila tem mais de um processo, então precisamos
+             * percorrer a lista e procurar por um processo de
+             * prioridade igual, ou um caso em que o `rp` tenha uma
+             * prioridade que fique entre dois processos.
+             */
+            struct proc *aux = rdy_head[TASK_Q];
+            while (aux != NIL_PROC) {
+                if (is_same_priority(aux, rp) || is_priority_between_proccesses(aux, rp)) {
+                    struct proc *next = aux->p_nextready;
+                    aux->p_nextready = rp;
+                    rp->p_nextready = next;
+                    break;
+                }
+
+                aux = aux->p_nextready;
+            }
+        }
+    } else {
+        /**
+         * Adiciona o processo como o primeiro na lista.
+         */
+        proc_ptr =      /* run fresh task next */
+            rdy_head[TASK_Q] = rp;  /* add to empty queue */
+        /**
+         * Adiciona o processo no fim da fila.
+         */
+        rdy_tail[TASK_Q] = rp;
+        /**
+         * Define o proximo processo como NIL_PROC.
+         */
+        rp->p_nextready = NIL_PROC; /* new entry has no successor */
+    }
+    return;
   }
-  if (isservp(rp)) {		/* others are similar */
-	if (rdy_head[SERVER_Q] != NIL_PROC)
-		rdy_tail[SERVER_Q]->p_nextready = rp;
-	else
-		rdy_head[SERVER_Q] = rp;
-	rdy_tail[SERVER_Q] = rp;
-	rp->p_nextready = NIL_PROC;
-	return;
+
+  if (isservp(rp)) {        /* others are similar */
+      if (rdy_head[SERVER_Q] != NIL_PROC) {
+          /**
+           * Se só houver um processo na fila, adiciona ele na
+           * posição dependendo da prioridade (q_priority).
+           */
+          if (rdy_head[SERVER_Q]->p_nextready == NIL_PROC) {
+              /**
+               * Se a prioridade do processo atual for maior do que a do
+               * rp, então joga o rp para o fim da fila.
+               */
+              if (rdy_head[SERVER_Q]->q_priority > rp->q_priority) {
+                  rdy_tail[SERVER_Q]->p_nextready = rp;
+              } else {
+                  /**
+                   * Se a prioridade do rp for maior, então adiciona ele
+                   * na primeira posição da fila e joga o no head para o
+                   * próximo.
+                   */
+                  struct proc *aux = rdy_head[SERVER_Q];
+                  rp->p_nextready = aux;
+                  rdy_head[TASK_Q] = rp;
+                  rdy_tail[TASK_Q] = aux;
+                  aux->p_nextready = NIL_PROC;
+              }
+          } else {
+              /**
+               * Se a fila tem mais de um processo, então precisamos
+               * percorrer a lista e procurar por um processo de
+               * prioridade igual, ou um caso em que o `rp` tenha uma
+               * prioridade que fique entre dois processos.
+               */
+              struct proc *aux = rdy_head[SERVER_Q];
+              while (aux != NIL_PROC) {
+                  if (is_same_priority(aux, rp) || is_priority_between_proccesses(aux, rp)) {
+                      struct proc *next = aux->p_nextready;
+                      aux->p_nextready = rp;
+                      rp->p_nextready = next;
+                      break;
+                  }
+
+                  aux = aux->p_nextready;
+              }
+          }
+          rdy_tail[SERVER_Q]->p_nextready = rp;
+      } else {
+          rdy_head[SERVER_Q] = rp;
+          rdy_tail[SERVER_Q] = rp;
+          rp->p_nextready = NIL_PROC;
+      }
+      return;
   }
   /* Add user process to the front of the queue.  (Is a bit fairer to I/O
    * bound processes.)
    */
-  if (rdy_head[USER_Q] == NIL_PROC)
-	rdy_tail[USER_Q] = rp;
-  rp->p_nextready = rdy_head[USER_Q];
-  rdy_head[USER_Q] = rp;
+  if (rdy_head[USER_Q] == NIL_PROC) {
+      rdy_tail[USER_Q] = rp;
+      rp->p_nextready = rdy_head[USER_Q];
+      rdy_head[USER_Q] = rp;
+  } else {
+      /**
+       * Se só houver um processo na fila, adiciona ele na
+       * posição dependendo da prioridade (q_priority).
+       */
+      if (rdy_head[SERVER_Q]->p_nextready == NIL_PROC) {
+          /**
+           * Se a prioridade do processo atual for maior do que a do
+           * rp, então joga o rp para o fim da fila.
+           */
+          if (rdy_head[SERVER_Q]->q_priority > rp->q_priority) {
+              rdy_tail[SERVER_Q]->p_nextready = rp;
+          } else {
+              /**
+               * Se a prioridade do rp for maior, então adiciona ele
+               * na primeira posição da fila e joga o no head para o
+               * próximo.
+               */
+              struct proc *aux = rdy_head[SERVER_Q];
+              rp->p_nextready = aux;
+              rdy_head[TASK_Q] = rp;
+              rdy_tail[TASK_Q] = aux;
+              aux->p_nextready = NIL_PROC;
+          }
+      } else {
+          /**
+           * Se a fila tem mais de um processo, então precisamos
+           * percorrer a lista e procurar por um processo de
+           * prioridade igual, ou um caso em que o `rp` tenha uma
+           * prioridade que fique entre dois processos.
+           */
+          struct proc *aux = rdy_head[SERVER_Q];
+          while (aux != NIL_PROC) {
+              if (is_same_priority(aux, rp) || is_priority_between_proccesses(aux, rp)) {
+                  struct proc *next = aux->p_nextready;
+                  aux->p_nextready = rp;
+                  rp->p_nextready = next;
+                  break;
+              }
+
+              aux = aux->p_nextready;
+          }
+      }
+  }
 }
 
 /*===========================================================================*
- *				unready					     * 
+ *              unready                      * 
  *===========================================================================*/
 PRIVATE void unready(rp)
-register struct proc *rp;	/* this process is no longer runnable */
+register struct proc *rp;   /* this process is no longer runnable */
 {
 /* A process has blocked. */
 
@@ -548,7 +716,7 @@ message *dst_m;			/* destination buffer */
 {
   /* convert virtual address to physical address */
   /* The caller has already checked if all addresses are within bounds */
-  
+
   src_m = (message *)((char *)src_m + (((phys_bytes)src_p->p_map[D].mem_phys
 				- src_p->p_map[D].mem_vir) << CLICK_SHIFT));
   dst_m = (message *)((char *)dst_m + (((phys_bytes)dst_p->p_map[D].mem_phys
