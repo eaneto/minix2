@@ -328,7 +328,7 @@ PRIVATE void pick_proc()
 PRIVATE int is_priority_between_proccesses(struct proc *proc1, struct proc *proc2)
 {
     return proc1->q_priority < proc2->q_priority &&
-            proc1->p_nextready->q_prioriry >= proc2->q_prioriry;
+        proc1->p_nextready->q_prioriry >= proc2->q_prioriry;
 }
 
 /**
@@ -359,52 +359,52 @@ register struct proc *rp;   /* this process is now runnable */
      * prioridade (q_priority) do processo.
      */
     if (istaskp(rp)) {
+    /**
+     * Verifica se a fila não está vazia
+     */
+    if (rdy_head[TASK_Q] != NIL_PROC) {
         /**
-         * Verifica se a fila não está vazia
+         * Se só houver um processo na fila, adiciona ele na
+         * posição dependendo da prioridade (q_priority).
          */
-        if (rdy_head[TASK_Q] != NIL_PROC) {
-            /**
-             * Se só houver um processo na fila, adiciona ele na
-             * posição dependendo da prioridade (q_priority).
-             */
-            if (rdy_head[TASK_Q]->p_nextready == NIL_PROC) {
-                if (rdy_head[TASK_Q]->q_priority > rp->q_priority) {
-                    rdy_tail[TASK_Q]->p_nextready = rp;
-                } else {
-                    struct proc *aux = rdy_head[TASK_Q];
-                    rdy_tail[TASK_Q]->p_nextready = aux;
-                    rdy_head[TASK_Q] = rp;
-                }
+        if (rdy_head[TASK_Q]->p_nextready == NIL_PROC) {
+            if (rdy_head[TASK_Q]->q_priority > rp->q_priority) {
+                rdy_tail[TASK_Q]->p_nextready = rp;
             } else {
                 struct proc *aux = rdy_head[TASK_Q];
-                while (aux != NIL_PROC) {
-                    if (is_same_priority(aux, rp) || is_priority_between_proccesses(aux, rp)) {
-                        struct proc *next = aux->p_nextready;
-                        aux->p_nextready = rp;
-                        rp->p_nextready = next;
-                        break;
-                    }
-
-                    aux = aux->p_nextready;
-                }
+                rdy_tail[TASK_Q]->p_nextready = aux;
+                rdy_head[TASK_Q] = rp;
             }
         } else {
-            /**
-             * Adiciona o processo como o primeiro na lista.
-             */
-            proc_ptr =      /* run fresh task next */
-                rdy_head[TASK_Q] = rp;  /* add to empty queue */
+            struct proc *aux = rdy_head[TASK_Q];
+            while (aux != NIL_PROC) {
+                if (is_same_priority(aux, rp) || is_priority_between_proccesses(aux, rp)) {
+                    struct proc *next = aux->p_nextready;
+                    aux->p_nextready = rp;
+                    rp->p_nextready = next;
+                    break;
+                }
+
+                aux = aux->p_nextready;
+            }
         }
+    } else {
         /**
-         * Adiciona o processo no fim da fila.
+         * Adiciona o processo como o primeiro na lista.
          */
-        rdy_tail[TASK_Q] = rp;
-        /**
-         * Define o proximo processo como NIL_PROC.
-         */
-        rp->p_nextready = NIL_PROC; /* new entry has no successor */
-        return;
+        proc_ptr =      /* run fresh task next */
+        rdy_head[TASK_Q] = rp;  /* add to empty queue */
     }
+    /**
+     * Adiciona o processo no fim da fila.
+     */
+    rdy_tail[TASK_Q] = rp;
+    /**
+     * Define o proximo processo como NIL_PROC.
+     */
+    rp->p_nextready = NIL_PROC; /* new entry has no successor */
+    return;
+  }
 
   if (isservp(rp)) {        /* others are similar */
     if (rdy_head[SERVER_Q] != NIL_PROC)
