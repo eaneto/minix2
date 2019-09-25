@@ -179,7 +179,7 @@ message *m_ptr;			/* pointer to message buffer */
   vhi = (vb + MESS_SIZE - 1) >> CLICK_SHIFT;	/* vir click for top of msg */
   if (vlo < caller_ptr->p_map[D].mem_vir || vlo > vhi ||
       vhi >= caller_ptr->p_map[S].mem_vir + caller_ptr->p_map[S].mem_len)
-        return(EFAULT); 
+	return(EFAULT); 
 #else
   /* Check for messages wrapping around top of memory or outside data seg. */
   vb = (vir_bytes) m_ptr;
@@ -205,7 +205,7 @@ message *m_ptr;			/* pointer to message buffer */
   /* Check to see if 'dest' is blocked waiting for this message. */
   if ( (dest_ptr->p_flags & (RECEIVING | SENDING)) == RECEIVING &&
        (dest_ptr->p_getfrom == ANY ||
-        dest_ptr->p_getfrom == proc_number(caller_ptr))) {
+	dest_ptr->p_getfrom == proc_number(caller_ptr))) {
 	/* Destination is indeed waiting for this message. */
 	CopyMess(proc_number(caller_ptr), caller_ptr, m_ptr, dest_ptr,
 		 dest_ptr->p_messbuf);
@@ -335,18 +335,39 @@ register struct proc *rp;	/* this process is now runnable */
  *   USER_Q   - (lowest priority) for user processes
  */
 
-  if (istaskp(rp)) {
-	if (rdy_head[TASK_Q] != NIL_PROC)
-		/* Add to tail of nonempty queue. */
-		rdy_tail[TASK_Q]->p_nextready = rp;
-	else {
-		proc_ptr =		/* run fresh task next */
-		rdy_head[TASK_Q] = rp;	/* add to empty queue */
-	}
-	rdy_tail[TASK_Q] = rp;
-	rp->p_nextready = NIL_PROC;	/* new entry has no successor */
-	return;
-  }
+    /**
+     * É preciso adicionar na fila de processos dependendo da
+     * prioridade (q_prioriry) do processo.
+     */
+    if (istaskp(rp)) {
+        /**
+         * Verifica se a fila não está vazia
+         */
+        if (rdy_head[TASK_Q] != NIL_PROC) {
+            /**
+             * Adiciona para o fim da lista (não vazia).
+             */
+            struct proc *aux;
+            for (aux = rdy_head[TASK_Q]; aux != NIL_PROC;aux = aux->p_nextready);
+            rdy_tail[TASK_Q]->p_nextready = rp;
+        } else {
+            /**
+             * Adiciona o processo como o primeiro na lista.
+             */
+            proc_ptr =		/* run fresh task next */
+                rdy_head[TASK_Q] = rp;	/* add to empty queue */
+        }
+        /**
+         * Adiciona o processo no fim da fila.
+         */
+        rdy_tail[TASK_Q] = rp;
+        /**
+         * Define o proximo processo como NIL_PROC.
+         */
+        rp->p_nextready = NIL_PROC;	/* new entry has no successor */
+        return;
+    }
+
   if (isservp(rp)) {		/* others are similar */
 	if (rdy_head[SERVER_Q] != NIL_PROC)
 		rdy_tail[SERVER_Q]->p_nextready = rp;
@@ -548,7 +569,7 @@ message *dst_m;			/* destination buffer */
 {
   /* convert virtual address to physical address */
   /* The caller has already checked if all addresses are within bounds */
-  
+
   src_m = (message *)((char *)src_m + (((phys_bytes)src_p->p_map[D].mem_phys
 				- src_p->p_map[D].mem_vir) << CLICK_SHIFT));
   dst_m = (message *)((char *)dst_m + (((phys_bytes)dst_p->p_map[D].mem_phys

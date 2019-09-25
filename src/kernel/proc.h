@@ -8,6 +8,8 @@
  * 'proc', be sure to change sconst.h to match.
  */
 
+#include "type.h"
+
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
 
@@ -40,6 +42,7 @@ struct proc {
   struct mem_map p_map[NR_SEGS];/* memory map */
   pid_t p_pid;			/* process id passed in from MM */
   int p_priority;		/* task, server, or user process */
+  int q_prioriry;
 
   clock_t user_time;		/* user time in ticks */
   clock_t sys_time;		/* sys time in ticks */
